@@ -223,14 +223,14 @@ MonoBehaviour:
   secondaryDistortAxis: 0
   visualizeMainWaveGradient: 0
   visualizeSeconaryWaveGradient: 0
-  waveLength1: 5
-  waveSpeed1: 1.5
-  waveHeight1: 0.08
+  waveLength1: 10
+  waveSpeed1: 1.2
+  waveHeight1: 0.12
   gradientBlending1: 0.8
   gradientOffset1: 0
-  waveLength2: 3
-  waveSpeed2: 1
-  waveHeight2: 0.02
+  waveLength2: 8
+  waveSpeed2: 0.7
+  waveHeight2: 0.05
   gradientBlending2: 0.5
   gradientOffset2: 0
   clampMinMax: {x: -0.1, y: 3}

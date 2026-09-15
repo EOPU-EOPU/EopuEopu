@@ -259,7 +259,7 @@ namespace LowPolyUnderwaterPack
 
             #region Wave 1 Settings
 
-            wave1Foldout = EditorGUILayout.Foldout(generalFoldout, "Wave 1 Settings");
+            wave1Foldout = EditorGUILayout.Foldout(wave1Foldout, "Wave 1 Settings");
 
             if (wave1Foldout)
             {
@@ -278,7 +278,7 @@ namespace LowPolyUnderwaterPack
 
             #region Wave 2 Settings
 
-            wave2Foldout = EditorGUILayout.Foldout(generalFoldout, "Wave 2 Settings");
+            wave2Foldout = EditorGUILayout.Foldout(wave2Foldout, "Wave 2 Settings");
 
             if (wave2Foldout)
             {
@@ -297,7 +297,7 @@ namespace LowPolyUnderwaterPack
 
             #region Misc. Settings
 
-            miscFoldout = EditorGUILayout.Foldout(generalFoldout, "Misc. Settings");
+            miscFoldout = EditorGUILayout.Foldout(miscFoldout, "Misc. Settings");
 
             if (miscFoldout)
             {
