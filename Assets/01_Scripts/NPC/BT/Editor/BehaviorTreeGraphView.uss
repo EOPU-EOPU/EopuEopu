@@ -1,0 +1,45 @@
+/* GridBackground는 이 커스텀 프로퍼티들이 없으면 선을 그리지 않는다. */
+GridBackground
+{
+    --grid-background-color: rgb(40, 40, 40);
+    --line-color: rgba(193, 196, 192, 0.1);
+    --thick-line-color: rgba(193, 196, 192, 0.2);
+    --spacing: 15;
+}
+
+/* 형제 중 실행 순서. 타이틀 오른쪽에 붙는다. */
+.bt-node__order
+{
+    min-width: 14px;
+    margin-left: 6px;
+    font-size: 10px;
+    color: rgb(255, 200, 90);
+    -unity-text-align: middle-center;
+}
+
+/* 구조에 문제가 있는 노드. GraphView 내부 구조에 의존하지 않도록 양쪽 다 칠한다. */
+.bt-node--invalid
+{
+    border-color: rgb(220, 80, 80);
+    border-width: 2px;
+}
+
+.bt-node--invalid #node-border
+{
+    border-color: rgb(220, 80, 80);
+    border-width: 2px;
+}
+
+/* 선택된 에이전트가 지금 실행 중인 노드. Play 모드에서만 붙는다. */
+.bt-node--running
+{
+    border-color: rgb(90, 220, 130);
+    border-width: 2px;
+}
+
+.bt-node--running #node-border
+{
+    border-color: rgb(90, 220, 130);
+    border-width: 2px;
+    background-color: rgba(90, 220, 130, 0.15);
+}
