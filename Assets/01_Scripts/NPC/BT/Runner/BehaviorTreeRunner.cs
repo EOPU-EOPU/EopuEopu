@@ -44,7 +44,9 @@ public class BehaviorTreeRunner : MonoBehaviour
             return;
         }
 
-        context = new BehaviorTreeContext(tree.NodeCount, actions);
+        var blackboard = new Blackboard();
+
+        context = new BehaviorTreeContext(tree.NodeCount, actions, blackboard);
     }
 
     // SERVER ONLY — BT는 호스트에서만 돈다.
