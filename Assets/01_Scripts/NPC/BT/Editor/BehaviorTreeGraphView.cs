@@ -7,7 +7,7 @@ using UnityEngine.UIElements;
 
 public class BehaviorTreeGraphView : GraphView
 {
-    private const string STYLE_SHEET_PATH = "Assets/01_Scripts/Predator/BT/Editor/BehaviorTreeGraphView.uss";
+    private const string STYLE_SHEET_PATH = "Assets/01_Scripts/NPC/BT/Editor/BehaviorTreeGraphView.uss";
     private const string UNDO_LABEL = "Behavior Tree Edit";
 
     private readonly List<BehaviorNodeProblem> problems = new List<BehaviorNodeProblem>();
