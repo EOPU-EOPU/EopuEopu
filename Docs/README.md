@@ -13,7 +13,7 @@
 
 ```
 1일차   이 문서 (5분)
-        LEARN/01_CONCEPTS.md (30분)   ← 권위·예측·보간이 뭔지. 지식 0 대상
+        LEARN/01_CONCEPTS.md (30분)   ← 권위·보간이 뭔지. 지식 0 대상
         SPEC.md 1~2절 (10분)          ← 무슨 게임인지
 
 2일차   내 폴더의 CLAUDE.md (아래 표)  ← 여기서 뭘 하면 안 되는지
@@ -34,16 +34,14 @@
 | **UI · HUD · 연출** | [API 7절 UI 계약](API.md) | [`_Local/CLAUDE.md`](../Assets/01_Scripts/_Local/CLAUDE.md) | P07 |
 | **네트워크** | [`MOTION.md`](MOTION.md) | [`_Net/CLAUDE.md`](../Assets/01_Scripts/_Net/CLAUDE.md) | P00~ |
 
-> **플레이어 담당은 베이스를 상속하는 게 아니라 HFSM을 짜서 넘기는 구조**라
-> 별도 문서가 있다. [`PLAYER.md`](PLAYER.md)를 먼저 읽는다.
+> **플레이어 담당은 베이스를 상속하지 않는다.** HFSM과 `PlayerMotor`를 `_Game`에 직접 짠다(이동이 클라 권위).
+> [`PLAYER.md`](PLAYER.md)를 먼저 읽는다.
 >
-> **AI 담당이 행동 트리를 쓴다면** `PLAYER.md` 1·6절(서버에서 tick · 시간은 틱으로)이
-> 그대로 적용된다. 같은 구조다.
+> **AI 담당의 행동 트리는 서버에서 돈다.** 플레이어와 달리 포식자·피식자는 서버 권위다.
 
-**`MOTION.md`는 네트워크 담당 전용이다.** 나머지는 안 읽어도 된다.
+**`MOTION.md`는 네트워크 담당과 플레이어 담당이 읽는다.** 나머지는 안 읽어도 된다.
 
-> **입력·카메라 담당은 P02를 기다린다.** 입력 프레임 계약이 나와야 거기 맞춰 붙일 수 있다.
-> 그 전에는 로컬 목업으로 감각만 잡고, **목업을 그대로 인계하지 않는다.**
+> **플레이어 담당은 네트워크 담당을 기다리지 않는다.** 싱글 씬에서 HFSM·Motor·입력·카메라를 만들어 두면 P02에서 그대로 붙는다.
 
 ---
 
@@ -65,7 +63,7 @@
 | [`ROADMAP.md`](ROADMAP.md) | **어떤 순서로** 만드나 | 전원 |
 | [`PLAYER.md`](PLAYER.md) | 플레이어 **상태(HFSM)** 를 어떻게 짜나 | 플레이어 담당 |
 | [`API.md`](API.md) | 팀원이 **뭘 상속**하나 | 기능 담당 |
-| [`MOTION.md`](MOTION.md) | 이동을 **어떻게** 만드나 | 네트워크 담당 |
+| [`MOTION.md`](MOTION.md) | 이동을 **어떻게** 만드나 | 네트워크 · 플레이어 담당 |
 | [`TESTING.md`](TESTING.md) | 어떻게 확인하나 | 전원 |
 
 ### 참조 — 거의 안 바뀐다
@@ -73,7 +71,7 @@
 | 문서 | 역할 |
 |---|---|
 | [`LEARN/01_CONCEPTS.md`](LEARN/01_CONCEPTS.md) | 네트워크 개념 입문. **멀티 경험 없으면 여기부터** |
-| [`LEARN/02_KINEMATIC.md`](LEARN/02_KINEMATIC.md) | 왜 `AddForce`를 못 쓰나 |
+| [`LEARN/02_KINEMATIC.md`](LEARN/02_KINEMATIC.md) | 왜 내 물고기는 Dynamic, 남의 물고기는 Kinematic인가 |
 | [`BACKLOG.md`](BACKLOG.md) | 후순위 기능의 보존된 설계. **착수할 때만 연다** |
 | [`archive/`](archive/) | 과거 검토 이력, 포트폴리오 계획 |
 
@@ -89,10 +87,10 @@
 | 지금 어느 페이즈인지 | [`STATUS.md`](../STATUS.md) |
 | 아직 안 정해진 기획 6개 | [`SPEC.md` 6절](SPEC.md) |
 
-**베이스 클래스는 4개다** — `NetPlayerMotor` · `NetServerAI` · `NetObjective` · `NetAbility`
-시그니처는 [`API.md`](API.md)가 정본이다.
+**베이스 클래스는 3개다** — `NetServerAI` · `NetObjective` · `NetAbility`
+시그니처는 [`API.md`](API.md)가 정본이다. 플레이어 이동은 베이스 없이 `PlayerMotor` + `NetworkTransform`.
 
-> **P04를 통과하기 전에는 4인 원격 테스트를 열지 않는다.**
+> **P02 게이트를 통과하기 전에는 4인 원격 테스트를 열지 않는다.**
 > 이동이 흔들리면 그 위에 쌓은 판정·연출·밸런스를 전부 다시 맞춰야 한다.
 
 ---
@@ -129,6 +127,7 @@
 
 | 날짜 | 변경 |
 |---|---|
+| 2026-09-23 | 이동을 서버 권위 → **클라 권위 + `NetworkTransform`.** P03·P04를 P02에 통합, `NetPlayerMotor` 폐기, T17·T25 삭제. 옛 이동 계약은 `archive/` |
 | 2026-09-21 | **문서 구조 재편.** 상태/계약/참조 3종류로 분리. `STATUS`·`SPEC`·`ROADMAP` 신설, 중복 제거 |
 | 2026-09-21 | **범위 축소.** 자원/창고/건설/부화/바늘/새 후순위, 동료 구조·재시작 제외, 허기 정수 단계화 |
 | 2026-09-19 | 본 기획서 대조. 매칭 범위 밖, 성장 시 몸집 변화 제외, `SpeedFor` 시그니처 변경 |
