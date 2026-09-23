@@ -5,16 +5,18 @@
 > **구현 확인 전 계약 초안이다.** 아래 선언을 그대로 `.cs`에 붙여 넣으면 컴파일되지 않는다.
 > 실제 `_Net/` 코드와 대조하고, 어긋나면 네트워크 담당에게 알린다.
 
-플레이어 이동은 여기 없다 → [MOTION.md](MOTION.md) (네트워크 담당 소관)
+플레이어 이동은 여기 없다 → [MOTION.md](MOTION.md) · [PLAYER.md](PLAYER.md)
 
-## 베이스는 4개다
+## 베이스는 3개다
 
 | 절 | 베이스 | 쓰임 | 붙는 페이즈 |
 |---|---|---|---|
 | 1 | `NetObjective` | 정화 퀘스트 — 붙어 있는 동안 진행도가 찬다 | P07 |
 | 2 | `NetServerAI` | 포식자 · 피식자 | P06 |
 | 3 | `NetAbility` | 물고기 4종 능력 | P08 |
-| — | `NetPlayerMotor` | 플레이어 이동 | P02~P04 — 네트워크 담당 |
+
+`NetPlayerMotor`는 **폐기했다**(2026-09-23). 이동이 클라 권위라 베이스가 필요 없다.
+플레이어 이동은 `_Game`의 일반 MonoBehaviour `PlayerMotor` + Mirror `NetworkTransform`이 맡는다.
 
 `NetInteractable`은 **지금 만들지 않는다.** 용례가 "피식자 먹기" 하나뿐이라
 `NetPlayer.RequestEat`로 처리한다(4절). 자원 채집이 후순위에서 돌아와 용례가 2개가 되면 그때 추출한다.
@@ -32,7 +34,8 @@
 
 호출자 · 게임 상태 · 거리 · 쿨다운 · 대상 유효성.
 **클라가 넘긴 player ID를 호출자 신원으로 믿지 않는다.**
-**거리 판정에는 서버 시뮬레이션 좌표만 쓴다.**
+**거리 판정에는 서버가 가진 Transform만 쓴다. 요청에 좌표를 싣지 않는다.**
+플레이어 좌표는 늦게 도착하므로 허용오차를 둔다 → [MOTION.md](MOTION.md) 5절
 
 ### 훅의 실행 위치
 
@@ -261,17 +264,36 @@ public abstract class NetServerAI : NetworkBehaviour
 - **판정용 난수는 직접 굴리지 않는다.** 클라에서 굴리면 4명이 다른 결과를 본다.
   연출용 난수(파티클 흔들림)는 상관없다
 
-## 피식자는 컴포넌트 2개다
+## 프리팹 구성
+
+```
+포식자
+├── NetworkIdentity
+├── NetworkTransformReliable    syncDirection = ServerToClient
+├── Rigidbody                   isKinematic = true, useGravity = false
+└── 포식자AI : NetServerAI
+
+피식자
+├── NetworkIdentity             ← 오브젝트당 1개
+├── NetworkTransformReliable    syncDirection = ServerToClient
+├── Rigidbody                   isKinematic = true, useGravity = false
+├── 피식자AI : NetServerAI       ← 헤엄치기
+└── 먹히기 (일반 컴포넌트)        ← 소비 여부 플래그
+```
+
+- **위치는 서버가 정하고 NT가 나른다.** 클라에서는 `Think`와 이동이 돌지 않고, NT 보간 위치를 그리기만 한다
+- **클라에서 Transform을 건드리지 않는다.** 다음 스냅샷에 덮인다
+- **Rigidbody는 kinematic이다.** 물리와 NT가 Transform을 서로 잡아당기면 떤다 → [LEARN/02_KINEMATIC.md](LEARN/02_KINEMATIC.md)
+- **플레이어와 물리 충돌하지 않는다.** 콜라이더는 트리거로 두거나 레이어로 끈다 → [MOTION.md](MOTION.md) 1.1절
+- 공격 판정용 트리거 Collider는 붙여도 되지만 **판정은 서버에서만** 처리한다.
+  클라의 `OnTrigger*`로 피해를 주지 않는다 — 트리거는 4대 PC 모두에서 발생한다
+- 송신 주기 시작값은 [SPEC.md](SPEC.md) 4절 권위표를 따른다
+- 애니메이션·포효는 `State`(int)를 받아 `OnStateChangedClient`에서 로컬로 구동한다. `NetworkAnimator`는 쓰지 않는다
+
+## 피식자는 컴포넌트가 2개다
 
 피식자는 **헤엄치면서 먹히기도** 한다. C#은 다중 상속이 안 되지만,
-Mirror는 하나의 `NetworkIdentity` 아래 `NetworkBehaviour`를 여러 개 허용한다.
-
-```
-피식자 프리팹
-├── NetworkIdentity       ← 오브젝트당 1개
-├── 피식자AI : NetServerAI   ← 헤엄치기
-└── 먹히기 (일반 컴포넌트)    ← 소비 여부 플래그
-```
+Mirror는 하나의 `NetworkIdentity` 아래 `NetworkBehaviour`를 여러 개 허용한다. 위 구성의 AI + 먹히기가 그것이다.
 
 **포식 판정 자체는 `_Net`이 한다**(4절).
 
@@ -321,7 +343,8 @@ public abstract class NetAbility : NetworkBehaviour
 - `GrowthLevel`은 **플레이어별 상태**이고 강화 배율도 그 플레이어에게만 적용된다
 - **공유되는 것은 능력의 *결과*다.** 강화된 A가 정화를 빨리 진행하면 4명이 같은 속도로 본다
 - 진행형 목표에 영향을 주는 능력은 `SpeedFor(n, weightSum)`의 **A 자신의 가중치**로만 들어간다(1절)
-- 능력이 이동에 영향을 준다면(가속 등) **5절 디버프와 같은 제약**을 받는다
+- 능력이 이동에 영향을 준다면(가속 등) **5절 감속 디버프와 같은 방식**이다 —
+  서버가 정수 단계 SyncVar를 올리고 소유 클라 `PlayerMotor`가 읽는다
 
 ## ⚠️ 명세가 아직 없다
 
@@ -351,12 +374,19 @@ public class NetPlayer : NetworkBehaviour, IPlayerView
     public int     HungerStage { get; }  // 0~10 정수 단계
     public int     GrowthLevel { get; }
     public bool    IsDowned    { get; }
-    public Vector3 Position    { get; }  // 서버 좌표. 표시 전용
-    public NetPlayerMotor Motor { get; }
+    public Vector3 Position    { get; }  // 표시 전용
+    public NetPlayerVitals Vitals { get; }
 
-    [Server] public void SetState(int state);
+    [Server] public void SetState(int state);   // Downed 강제 등 서버 전이
 
-    public void RequestEat(uint targetNetId);   // 소유 클라만 호출
+    public void ReportState(int state);         // 소유 클라만 호출. 서버가 검증 후 State에 반영
+    public void RequestEat(uint targetNetId);   // 소유 클라만 호출. 좌표를 싣지 않는다
+
+    // 서버 → 소유 클라. 소유 클라의 PlayerMotor가 구독한다
+    public event Action<Vector3, Quaternion> RespawnRequested;
+    public event Action<Vector3>             ImpulseReceived;
+    [Server] public void Respawn(Vector3 pos, Quaternion rot);   // 내부에서 TargetRpc
+    [Server] public void ApplyImpulse(Vector3 impulse);           // 내부에서 TargetRpc
 }
 
 public static class NetSpawner
@@ -370,6 +400,8 @@ public static class NetSpawner
 - `Spawn`/`Despawn`은 **서버에서만**. 내부에서 서버 활성 상태를 확인한다
 - **로컬 UI·파티클의 `Instantiate`/`Destroy`는 허용한다**
 - `[Server]` 속성은 **선언부에** 붙이고 호출은 서버 훅 안에서 한다
+- `ReportState`는 **`IsDowned` 중에는 거부**한다. Downed 진입·해제는 서버만 한다
+- **서버는 플레이어 Transform을 직접 쓰지 않는다.** 위치를 바꿔야 하면 `Respawn` / `ApplyImpulse`로 소유자에게 요청한다 → [MOTION.md](MOTION.md) 4절
 
 ## 포식은 원자적이어야 한다
 
@@ -404,6 +436,7 @@ public class NetPlayerVitals : NetworkBehaviour
     public int   HungerStage { get; }   // 0~10 정수 단계
     public int   GrowthLevel { get; }
     public bool  IsDowned    { get; }
+    public int   SlowStage   { get; }   // 감속 단계. 0 = 없음. PlayerMotor가 읽는다
 
     [Server] public void ApplyDamage(float amount, int sourceId);
     [Server] public void ApplyDebuff(int debuffId, float duration);
@@ -427,43 +460,42 @@ public class NetPlayerVitals : NetworkBehaviour
 
 ## 피격과 행동 불능
 
-- 포식자 피해는 **서버의 현재 위치와 서버 쿨다운**을 사용한다
+- 포식자 피해는 **서버의 현재 위치와 서버 쿨다운**을 사용한다.
+  플레이어 좌표가 늦게 도착하므로 **히트박스를 줄여** 판정한다 → [MOTION.md](MOTION.md) 5절
 - 같은 공격의 다중 Collider 접촉은 `attackInstanceId + targetNetId`로 중복 제거
-- HP는 0~maxHP로 제한. 디버프는 **효과 ID · 강도 · 종료 서버 틱**으로 관리
-- **HP 0이면 행동 불능.** 서버는 이동 입력을 이동에 반영하지 않고 상호작용을 거부한다
+- HP는 0~maxHP로 제한. 디버프는 **효과 ID · 강도 · 종료 서버 시각**으로 관리
+- **HP 0이면 행동 불능.** 소유 클라 `PlayerMotor`가 `IsDowned`를 보고 입력을 잠그고, 서버는 상호작용을 거부한다
 - **죽는 즉시 오브젝트를 파괴하지 않는다.** 논리 상태는 Downed로 두고 표현만 사망 애니메이션이다
 
 ## 자동 부활 — 15초
 
 ```
 1. 서버가 부활 완료 시각을 기록      ← 시각 하나만 동기화. 남은 시간을 매 프레임 안 보낸다
-2. 시각이 되면 HP 회복 + 디버프 해제
-3. MotionEpoch 증가 + 기준 상태를 신뢰성 전송
-4. 클라는 예측·보간 버퍼를 비우고 재개
-5. 서버는 이전 MotionEpoch의 입력을 거부
+2. 시각이 되면 HP 회복 + 디버프 해제 + IsDowned 해제
+3. 서버 → 소유자  NetPlayer.Respawn(pos, rot)
+4. 소유자가 순간이동하고 NT 텔레포트 경로로 모든 관찰자의 보간 버퍼를 비운다
 ```
 
-**3~5번이 없으면 부활 직후 물고기가 죽은 자리로 한 번 튕겼다 돌아온다.**
+**서버가 Transform을 직접 옮기면 소유자가 보내던 옛 좌표에 덮여 죽은 자리로 돌아간다.**
+**4번이 없으면 남의 화면에서 맵을 가로질러 미끄러진다.**
 
-→ 상세는 [MOTION.md](MOTION.md) 7절
+→ 상세는 [MOTION.md](MOTION.md) 4절
 
 ## 성장
 
 **피식자를 먹으면 `GrowthLevel`이 오르고 그 플레이어의 능력만 강화된다.**
 
 - **몸집이 커지는 기획은 제외했다**(2026-09-19).
-  `MoveStep`은 `GrowthLevel`을 읽지 않고 충돌 반경도 변하지 않는다
-- 나중에 크기 변화를 넣는다면 **`MoveStep`의 입력이 되므로**
-  **이동 계약 변경으로 취급하고 T16~T19를 다시 돌린다**
+  `PlayerMotor`는 `GrowthLevel`을 읽지 않고 충돌 반경도 변하지 않는다
+- 나중에 크기 변화를 넣는다면 **이동 계약 변경으로 취급하고 T16 · T18 · T19를 다시 돌린다**
 
 ## 이동에 영향을 주는 디버프
 
 **현재 해당하는 것은 감속 디버프 하나뿐이다.**
 
-서버와 소유 클라가 다른 값을 보면 **매 틱 재조정이 터진다.**
-
-- 정수 단계로만 두고 **연속값을 넣지 않는다**
-- 값은 `MoveConfig`에 담겨 **스냅샷과 함께** 온다
+- 서버가 `SlowStage`(정수 단계)를 올리고 내린다. **연속값을 넣지 않는다**
+- 소유 클라 `PlayerMotor`가 SyncVar를 읽어 속도 배율로 바꾼다.
+  RTT/2만큼 늦게 걸리고 늦게 풀리지만, 재조정이 없으니 튀지 않는다
 - **순수 시각 효과 디버프(화면 흐림 등)와 구분**해서 관리한다. 후자는 `_Local/`에서 끝난다
 
 ---
@@ -579,6 +611,17 @@ void OnDisable()
 
 API 동결은 **목표이지 영구 불변 약속이 아니다.**
 바꿔야 하면 **구현·예제·이 문서를 같은 커밋에서** 맞춘다.
+
+### 2026-09-23 이동 클라 권위 전환
+
+| 변경 | 내용 |
+|---|---|
+| 삭제 | `NetPlayerMotor` 베이스. 이동은 `_Game/PlayerMotor` + `NetworkTransformReliable` |
+| 삭제 | `NetPlayer.Motor` |
+| 추가 | `NetPlayer.Vitals` · `ReportState` · `Respawn` · `ApplyImpulse` · `RespawnRequested` · `ImpulseReceived` |
+| 추가 | `NetPlayerVitals.SlowStage` |
+| 변경 | 부활: `MotionEpoch` → 서버가 소유자에게 요청, 소유자가 순간이동 |
+| 변경 | 거리 판정: 서버 시뮬레이션 좌표 → 서버가 가진 Transform + 허용오차 |
 
 ### 2026-09-21 범위 축소
 
